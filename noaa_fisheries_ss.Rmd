@@ -1,0 +1,92 @@
+---
+title: "lab1 ss"
+author: "Shuhan Song"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+# attach packages
+library(tidyverse)
+library(here)
+library(janitor)
+library(kableExtra)
+```
+
+```{r}
+# Read in noaa_fisheries.csv data
+
+us_landings <- read_csv(here("data", "noaa_fisheries.csv"))
+
+```
+
+```{r}
+# clean the data
+
+landings_tidy <- us_landings %>% 
+  janitor::clean_names() %>% 
+  mutate(state = stringr::str_to_lower(state),
+         afs_name = stringr::str_to_lower(afs_name),
+         dollars_num = readr::parse_number(dollars_usd))
+
+```
+# Salmon landings 
+
+```{r}
+salmon_landings <- landings_tidy %>% 
+  mutate(afs_clean = stringr::str_remove(afs_name, pattern = "aggregate")) %>% 
+  filter(str_detect(afs_clean, pattern = "salmon")) %>% 
+  separate(afs_clean, into = c("group","species"), sep = ",")
+
+# stringr::str_detect returns TRUE or FALSE, filter keeps all TRUE rows 
+
+```
+
+Some grouped summary data:
+
+Find annual total US landings and dollar value for each type of salmon
+
+```{r}
+salmon_summary <- salmon_landings %>% 
+  group_by(year, species) %>% 
+  summarize(tot_landings = sum(landings_pounds),
+            tot_dollars = sum(dollars_num))
+
+```
+
+Make a graph
+
+```{r}
+salmon_landings_graph <- ggplot(salmon_summary, 
+                                aes(x = year, y = tot_landings, group = species)) + 
+  geom_line(aes(color = species)) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank()) + 
+  scale_y_continuous(labels = c(0, 100, 200, 300, 400)) +
+  labs(x = "Year", y = "US Salmon landings (Million lbs)", color = "Species")
+
+salmon_landings_graph
+```
+
+```{r, eval=FALSE}
+ggsave(plot = salmon_landings_graph, here("figures", "us_salmon_landings_ss.jpg"), width = 7, height = 5)
+```
+
+Make a nice kable Table
+
+```{r}
+salmon_first_five <- salmon_summary %>% 
+  arrange(desc(tot_landings)) %>% 
+  head(5)
+```
+
+```{r}
+kable(salmon_first_five, col.names = c("Year", "Species", "Total landings (lbs)", "Total dollars ($)")) %>% 
+  kable_styling(bootstrap_options = "striped", 
+                full_width = FALSE)
+```
+
